@@ -2,9 +2,7 @@
 
 ## Test Pcaps
 
-```shell
-$ scp solana@192.168.10.211:/data/Solana_datasets/mn-data/external_datasets/vpn_data/open_vpn/openvpn_gitClone_vpnEstablished_29-11-2024.pcap .
-```
+
 
 ## OpenVPN Opcodes
 
