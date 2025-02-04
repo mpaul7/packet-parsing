@@ -300,3 +300,61 @@ def is_ipsec_vpn_packet_v2(payload):
 
     """All heuristic conditions met: consider this an IPSec VPN packet."""
     return True
+
+def is_wireguard_packet(payload):
+    """
+    Determines if a packet is a WireGuard VPN packet based on the following heuristic:
+      a) The packet must be UDP.
+      b) The source or destination port must be 51820 (default WireGuard port).
+      c) The UDP payload must be at least 32 bytes long.
+      d) The first byte of the payload should be 1, 2, 3, 4 corresponding to WireGuard handshake message types:
+             1 - Handshake Initiation
+             2 - Handshake Response
+             3 - Cookie Reply
+             4 - Transport Message
+      e) The length of the payload should match the expected length based on the message type.
+      f) The first 3 bytes of the payload should be zero. These are reserved and always zero.  
+    Returns:
+        bool: True if the packet is likely a WireGuard packet, False otherwise.
+    """
+   
+    """ Clean the UDP payload hex string (remove colons and spaces) and convert to bytes."""
+    payload_hex = payload.replace(":", "").replace(" ", "")
+    try:
+        payload_bytes = bytes.fromhex(payload_hex)
+    except Exception as e:
+        # Conversion failed, so not a valid WireGuard packet.
+        return False
+
+    """Verify that the payload is long enough to contain the 4-byte message type."""
+    if len(payload_bytes) < 32:
+        return False
+
+    """Interpret the first 4 bytes as a little-endian integer."""
+    # msg_type = int.from_bytes(payload_bytes[0:4], byteorder='little')
+    msg_type = int(payload_bytes[0])
+    """Check payload length based on message type"""
+    expected_lengths = {
+        1: 148,  # Handshake Initiation
+        2: 92,   # Handshake Response 
+        3: 64,   # Cookie Reply
+        4: 32    # Transport Message (minimum)
+    }
+
+    if msg_type in expected_lengths:
+        # For message type 4, which is transport message, check if length is at least 32
+        if msg_type == 4:
+            if len(payload_bytes) < expected_lengths[msg_type]:
+                return False
+        # For other types, check exact length match
+        elif len(payload_bytes) != expected_lengths[msg_type]:
+            return False
+
+        # Check that bytes 1-3 are zero
+        if payload_bytes[1] != 0 or payload_bytes[2] != 0 or payload_bytes[3] != 0:
+            return False
+            
+        return True
+
+    return False
+    

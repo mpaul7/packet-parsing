@@ -126,3 +126,21 @@ When parsing the packet, we need to drop the first 12 bytes of the payload to ge
    Non-ESP Marker is 4 bytes of zero aligning with the SPI field of an
    ESP packet.
 ```
+
+
+## WireGuard
+
+```
+
+    Determines if a packet is a WireGuard VPN packet based on the following heuristic:
+      a) The packet must be UDP.
+      b) The source or destination port must be 51820 (default WireGuard port).
+      c) The UDP payload must be at least 32 bytes long.
+      d) The first byte of the payload should be 1, 2, 3, 4 corresponding to WireGuard handshake message types:
+             1 - Handshake Initiation
+             2 - Handshake Response
+             3 - Cookie Reply
+             4 - Transport Message
+      e) The length of the payload should match the expected length based on the message type.
+      f) The first 3 bytes of the payload should be zero. These are reserved and always zero.  
+ ```

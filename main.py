@@ -3,8 +3,6 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import os
 import click
-import pandas as pd
-import subprocess
 
 from src.parser.components.packet_parsing import PCAPExtract
 from src.parser.utils.common import ip_swap

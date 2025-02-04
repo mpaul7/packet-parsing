@@ -27,6 +27,9 @@ nest_asyncio.apply()
 class PCAPExtract:
     """_summary_
     """
+    def __init__(self):
+        self.vpn_checker = VPNPacketChecker()
+        
     def get_dns_sni_labels_pyshark(self, pcap):
         pcap = pyshark.FileCapture(pcap)
         flows = {}
@@ -82,23 +85,11 @@ class PCAPExtract:
                         sport = pkt.udp.srcport
                         dport = pkt.udp.dstport
                         
-                        """ check for IPSec packets in UDP """
-                        if sport in ['4500', '500'] and dport in ['4500', '500']:
-                            # Get UDP payload if available.
-                            if hasattr(pkt.udp, 'payload'):
-                                if sport == '500':
-                                    payload = pkt.udp.payload
-                                elif sport == '4500':
-                                    payload = pkt.udp.payload
-                                    
-                                    """ Ref [RFC 3948] - drop the first 12 bytes of the payload to get the actual IPsec packet 
-                                    Non-ESP Marker is 4 bytes of zero aligning with the SPI field of an ESP packet."""
-                                    payload = payload[12:]
-                                is_ipsec = is_ipsec_vpn_packet_v2(payload)
-                                if is_ipsec:
-                                    type = "IPSec"
-                                    vpn = "IPSecVPN"
-                                    
+                        # Check for VPN protocols
+                        vpn_type, packet_type = self.vpn_checker.check_packet(pkt, sport, dport)
+                        if vpn_type:
+                            vpn = vpn_type
+
                         """ check for OpenVPN packets in UDP """
                         if int(sport) == 1194 or int(dport) == 1194:  # Standard OpenVPN port
                             type = "OpenVPN"
@@ -578,5 +569,8 @@ class PCAPExtract:
         df['file_name'] = _get_name(file_name)  # append file name with the features when return the dataframe
         
         return df
+
+
+
 
 
