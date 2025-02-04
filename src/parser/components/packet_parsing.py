@@ -13,7 +13,7 @@ import subprocess
 from nfstream import NFStreamer
 from ipaddress import IPv4Network
 from ipaddress import IPv4Address
-
+from src.parser.utils.common import is_openvpn_udp_packet, is_openvpn_tcp_packet, is_ipsec_vpn_packet_v1, is_ipsec_vpn_packet_v2
 import nest_asyncio
 nest_asyncio.apply()
 TWPA_HOME = '/home/tw/projects/data_capture/datacap/general_scripts/twpa'
@@ -22,15 +22,21 @@ TWC_MODEL = f'{TWPA_HOME}/utils/twc_models/tuned_onnx_models_on_relabelled_data/
 NDPI_DATA = f'{TWPA_HOME}/utils/ndpi_data/ndpi_label.csv'
 TWC_OUTPUT = f'{TWPA_HOME}/data/twc_output'
 NDPI_HOME = '/home/tw/projects/ndpi_bin'
+
+
+
 class PCAPExtract:
     """_summary_
     
     """
+    
+    
+
     def get_dns_sni_labels_pyshark(self, pcap):
         pcap = pyshark.FileCapture(pcap)
         flows = {}
         for pkt in pcap:
-            sip = sport = dip = dport = protocol = dns_query = dns_ans = fqdn = sni =  0
+            sip = sport = dip = dport = protocol = vpn = http_host = dns_query = dns_ans = fqdn = sni = 0
             try:
                 if "ip" not in pkt:
                     continue
@@ -47,15 +53,64 @@ class PCAPExtract:
                         sport = pkt.tcp.srcport
                         dport = pkt.tcp.dstport
                         if "HTTP" in pkt:
-                            sni = pkt.http.host
+                            type = "HTTP"
+                            http_host = pkt.http.host
                         if "TLS" in pkt:
                             type = "TLS"
                             record = pkt.tls.record
                             if "Client Hello" in record:
                                 sni = pkt.tls.handshake_extensions_server_name
+                        """ check for IPSec packets in UDP """
+                        if sport in ['4500', '500'] and dport in ['4500', '500']:
+                            print(sport, dport)
+                            # Get UDP payload if available.
+                            if hasattr(pkt.udp, 'payload'):
+                                if sport == '500':
+                                    payload = pkt.udp.payload
+                                    # 
+                                elif sport == '4500':
+                                    payload = pkt.udp.payload
+                                    
+                                    """ Ref [RFC 3948] - drop the first 12 bytes of the payload to get the actual IPsec packet 
+                                    Non-ESP Marker is 4 bytes of zero aligning with the SPI field of an ESP packet."""
+                                    payload = payload[12:]
+                                is_ipsec = is_ipsec_vpn_packet_v2(payload)
+                                if is_ipsec:
+                                    type = "IPSec"
+                                    vpn = "IPSecVPN"
+                        if int(sport) == 1194 or int(dport) == 1194:  # Standard OpenVPN port
+                            type = "OpenVPN"
+                            is_openvpn, packet_type, opcode_hex = is_openvpn_tcp_packet(pkt.udp.payload)
+                            if is_openvpn:
+                                vpn = "OpenVPN"
                     if "UDP" in pkt:
                         sport = pkt.udp.srcport
                         dport = pkt.udp.dstport
+                        
+                        """ check for IPSec packets in UDP """
+                        if sport in ['4500', '500'] and dport in ['4500', '500']:
+                            # Get UDP payload if available.
+                            if hasattr(pkt.udp, 'payload'):
+                                if sport == '500':
+                                    payload = pkt.udp.payload
+                                elif sport == '4500':
+                                    payload = pkt.udp.payload
+                                    
+                                    """ Ref [RFC 3948] - drop the first 12 bytes of the payload to get the actual IPsec packet 
+                                    Non-ESP Marker is 4 bytes of zero aligning with the SPI field of an ESP packet."""
+                                    payload = payload[12:]
+                                is_ipsec = is_ipsec_vpn_packet_v2(payload)
+                                if is_ipsec:
+                                    type = "IPSec"
+                                    vpn = "IPSecVPN"
+                                    
+                        """ check for OpenVPN packets in UDP """
+                        if int(sport) == 1194 or int(dport) == 1194:  # Standard OpenVPN port
+                            type = "OpenVPN"
+                            is_openvpn, packet_type, opcode_hex = is_openvpn_udp_packet(pkt.udp.payload)
+                            if is_openvpn:
+                                vpn = "OpenVPN"
+                                
                         if "DNS" in pkt:
                             type = "DNS"
                             if pkt.dns.flags_response.int_value == 0: #pkt.dns.flags == '0x0100':  # dns query
@@ -75,6 +130,10 @@ class PCAPExtract:
 
                     if hash_f in flows:
                         flow = flows[hash_f]
+                        if flow[-6] == 0:
+                            flow[-6] = vpn
+                        if flow[-5] == 0:
+                            flow[-5] = http_host
                         if flow[-4] == 0:
                             flow[-4] = dns_query
                         if flow[-3] == 0:
@@ -86,6 +145,10 @@ class PCAPExtract:
                         flows[hash_f] = flow
                     elif hash_b in flows:
                         flow = flows[hash_b]
+                        if flow[-6] == 0:
+                            flow[-6] = vpn
+                        if flow[-5] == 0:
+                            flow[-5] = http_host
                         if flow[-4] == 0:
                             flow[-4] = dns_query
                         if flow[-3] == 0:
@@ -96,15 +159,15 @@ class PCAPExtract:
                             flow[-1] = sni
                         flows[hash_b] = flow
                     else:
-                        curr_flow = [sip, sport, dip, dport, protocol,  dns_query, dns_ans, fqdn, sni]
+                        curr_flow = [sip, sport, dip, dport, protocol, vpn, http_host, dns_query, dns_ans, fqdn, sni]
                         flows[hash_f] = curr_flow
             except Exception as e:
                 # print(f'{cnt} - {e}')
                 pass
         features = [v for k, v in flows.items()]
-        TUPLE_HEADER = ['sip', 'sport', 'dip', 'dport', 'protocol',  'dns_query', 'dns_ans', 'fqdn', 'sni']
+        TUPLE_HEADER = ['sip', 'sport', 'dip', 'dport', 'protocol',  'vpn', 'http_host', 'dns_query', 'dns_ans', 'fqdn', 'sni']
         df = pd.DataFrame(features, columns=TUPLE_HEADER)
-        return df[SNI_COLS]
+        return df
     
     def get_nfs_label(self, pcap_file: object) -> object:
         df = NFStreamer(source=pcap_file).to_pandas()
@@ -136,26 +199,9 @@ class PCAPExtract:
         df_ndpi = df_ndpi.drop(df_ndpi[drop_mask].index)
         return df_ndpi
     
-    def get_twc_label(self, pcap_file):
-        """provide the prediction labels for input pcap based on 
-        TWC using MODEL"""
-        TWC_cmd = ['twc', 'extract', '-f', 'csv', '-m', TWC_MODEL, '--notimestamp', 
-                   '--flow-duration', '-1', '--max-flow-packets', '-1', '--recent-flow-duration', '-1',   
-                   '-o', TWC_OUTPUT, pcap_file]
-        popen = subprocess.Popen(TWC_cmd, stdout=subprocess.PIPE)
-        popen.wait()
-        head, _tail = os.path.split(pcap_file)
-        tail = _tail.replace('pcap', 'csv')
-        df_twc = pd.read_csv(f'{TWC_OUTPUT}/{tail}')
-        df_twc = df_twc.rename(columns={'proto': 'protocol'})
-        col = ['sip', 'sport',  'dip', 'dport', 'protocol', 
-                       'relabelled_app_loose', 'relabelled_app_tight' ]
-        df_twc = df_twc[col]
-        return df_twc
         
     def get_statifc_ip_label(self, df):
-        """ Lable the destination ip in the input dataframe based on 
-        ndpi_database"""
+        """ Lable the destination ip in the input dataframe based on ndpi_database"""
         df['static_ip'] = 0
         ips = set(df.dip.to_list() + df.sip.to_list())
         df_ndpi_data = pd.read_csv(NDPI_DATA)
@@ -172,32 +218,6 @@ class PCAPExtract:
                         ndpi_label = str(df_ndpi_data.at[j, 'label']).strip(" ")
                         df.loc[df["dip"] == ip, "static_ip"] = ndpi_label
                         df.loc[df["sip"] == ip, "static_ip"] = ndpi_label
-         
-                # ip_map = defaultdict(list)    
-                # for ip in ips:
-                #     subnet  = []
-                #     subnet_range = []
-                #     labels = []
-                #     for j in range(len(df_ndpi_data)):
-                #         net_address = str(df_ndpi_data.at[j, 'net_address']).strip(" ")
-                #         label = str(df_ndpi_data.at[j, 'label']).strip(" ")
-                #         if IPv4Address(ip) in IPv4Network(net_address):
-                #             list_ips2 = len([str(ip) for ip in IPv4Network(net_address)])
-                #             subnet.append(net_address)
-                #             subnet_range.append(list_ips2)
-                #             labels.append(label)
-                #     ip_map[ip].append((subnet, subnet_range, labels))        
-                    
-                # for ip, v in ip_map.items():          
-                #     if len(v[0][1]) == 1:
-                #         ndpi_label =  v[0][2]
-                #         df.loc[df["dip"] == ip, "static_ip"] = ndpi_label
-                #         df.loc[df["sip"] == ip, "static_ip"] = ndpi_label
-                #     elif len(v[0][1]) >  1:
-                #         min_index = v[0][1].index(min(v[0][1]))
-                #         ndpi_label =  v[0][2][min_index]
-                #         df.loc[df["dip"] == ip, "static_ip"] = ndpi_label
-                #         df.loc[df["sip"] == ip, "static_ip"] = ndpi_label
         return df
 
     def get_reverse_ip(self, df):
@@ -277,8 +297,6 @@ class PCAPExtract:
                     else:
                         dns_types.append(0)
                         dict_dns_types[ans_type] = ans_data
-                    # print(ans_type, ans_data)
-                    # return ans_data
                 except (socket.error, ValueError):
                     continue
             elif rr.type == dpkt.dns.DNS_CNAME:
@@ -290,8 +308,6 @@ class PCAPExtract:
                 else:
                     dns_types.append(0)
                     dict_dns_types[ans_type] = ans_data
-                # print(ans_type, ans_data)
-                # return ans_data
             elif rr.type == dpkt.dns.DNS_MX:
                 ans_type = "MX"
                 ans_data = rr.mxname
@@ -323,25 +339,21 @@ class PCAPExtract:
                 else:
                     dns_types.append(0)
                     dict_dns_types[ans_type] = ans_data
-                # print(ans_type, ans_data)
-                # return ans_data
             elif rr.type == dpkt.dns.DNS_SOA:
                 ans_type = "SOA"
                 ans_data = ",".join([rr.mname,
-                                     rr.rname,
-                                     str(rr.serial),
-                                     str(rr.refresh),
-                                     str(rr.retry),
-                                     str(rr.expire),
-                                     str(rr.minimum)])
+                                    rr.rname,
+                                    str(rr.serial),
+                                    str(rr.refresh),
+                                    str(rr.retry),
+                                    str(rr.expire),
+                                    str(rr.minimum)])
                 if ans_type !=0:
                     dns_types.append(ans_data)
                     dict_dns_types[ans_type] = ans_data
                 else:
                     dns_types.append(0)
                     dict_dns_types[ans_type] = ans_data
-                # print(ans_type, ans_data)
-                # return ans_data
             elif rr.type == dpkt.dns.DNS_HINFO:
                 ans_type = "HINFO"
                 ans_data = " ".join(rr.text)
@@ -351,8 +363,6 @@ class PCAPExtract:
                 else:
                     dns_types.append(0)
                     dict_dns_types[ans_type] = ans_data
-                # print(ans_type, ans_data)
-                # return ans_data
             elif rr.type == dpkt.dns.DNS_TXT:
                 ans_type = "TXT"
                 ans_data = str(rr.text)
@@ -362,9 +372,6 @@ class PCAPExtract:
                 else:
                     dns_types.append(0)
                     dict_dns_types[ans_type] = ans_data
-                # print(ans_type, ans_data)
-                # return ans_data
-
             elif rr.type == dpkt.dns.DNS_SRV:
                 ans_type = "SRV"
                 ans_data = rr.srvname
@@ -374,11 +381,6 @@ class PCAPExtract:
                 else:
                     dns_types.append(0)
                     dict_dns_types[ans_type] = ans_data
-                # print(ans_type, ans_data)
-                # return ans_data
-            # dns_types = [socket.inet_ntoa(rr.rdata), 
-            #              socket.inet_ntop(socket.AF_INET6, rr.rdata), 
-            #              ]
         return ans_data, dns_types, dict_dns_types
     
     def get_dns_sni_labels_dpkt(self, pcap_file):
@@ -467,13 +469,7 @@ class PCAPExtract:
                                         # try:
                                         if TLS_EXTENSION_TYPES.get(ext[0]) == 'server_name':
                                             sni = str(ext[1], 'utf-8')[5:]
-                                            # print(sni)
-                                        # except Exception as e:
-                                        # print(e)
-                                        # pass
-
                             except Exception as e:
-                                # print(e)
                                 pass
 
                         elif ip.p == 17:  # TODO: handle client hello of QUIC flows(UDP, using 443 as ports)
@@ -529,9 +525,9 @@ class PCAPExtract:
                 else:
                     filter = f'ip.addr=={dip} && tcp.port=={sport}'
                     curr_flow = [sip, sport, dip, dport, filter, protocol, FQDN, dns_types,
-                                 sni,
-                                 dns_query, dns_ans,
-                                 syn_ack, tls_rec_hs, tls_rec_ccs, tls_rec_app_data, tls_rec_alert, fin_ack, rst]
+                                sni,
+                                dns_query, dns_ans,
+                                syn_ack, tls_rec_hs, tls_rec_ccs, tls_rec_app_data, tls_rec_alert, fin_ack, rst]
                     flows[hash_f] = curr_flow
             except Exception as e:
                 print(f'{e}')
@@ -539,11 +535,8 @@ class PCAPExtract:
             cnt += 1
 
         features = [v for k, v in flows.items()]
-        # print(features)
-        # TUPLE_HEADER = ['sip', 'sport', 'dip', 'dport', 'protocol',  'dns_query', 'dns_ans', 'fqdn', 'sni']
-        df = pd.DataFrame(features, columns=TUPLE_HEADER)
-        # print(df[SNI_COLS])
-        return df[SNI_COLS]
+        df = pd.DataFrame(features)
+        return df
 
     def _get_dns_label(self, df=None):
         dns_ans_dict = {}
@@ -572,7 +565,6 @@ class PCAPExtract:
         # df_pyshark = self.get_dns_sni_labels_dpkt(file_name)
         
         df_nfs = self.get_nfs_label(file_name)
-        # df_twc = self.get_twc_label(file_name)
         # df_ndpi = self.get_ndpi_label(file_name)
         # df_static_ip = self.get_statifc_ip_label(df_pyshark)
         df = self.get_reverse_ip(df_pyshark)
