@@ -16,12 +16,6 @@ from ipaddress import IPv4Address
 from src.parser.utils.common import is_openvpn_udp_packet, is_openvpn_tcp_packet, is_ipsec_vpn_packet_v1, is_ipsec_vpn_packet_v2
 import nest_asyncio
 nest_asyncio.apply()
-TWPA_HOME = '/home/tw/projects/data_capture/datacap/general_scripts/twpa'
-
-TWC_MODEL = f'{TWPA_HOME}/utils/twc_models/tuned_onnx_models_on_relabelled_data/models_on_relabelled_data_v2.json'
-NDPI_DATA = f'{TWPA_HOME}/utils/ndpi_data/ndpi_label.csv'
-TWC_OUTPUT = f'{TWPA_HOME}/data/twc_output'
-NDPI_HOME = '/home/tw/projects/ndpi_bin'
 
 
 
