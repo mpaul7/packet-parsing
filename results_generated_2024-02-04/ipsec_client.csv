@@ -1,0 +1,3 @@
+,sip,sport,dip,dport,protocol,first_timestamp_ms,nfs_app_label,nfs_traffic_type_label,nfs_requested_server_name,hash,vpn,http_host,dns_query,dns_ans,fqdn,sni,reverse_ip,file_name
+0,192.168.0.10,500,144.76.154.114,500,17,1421270042835,IPSec,VPN,,6f2f330627eb7bb89c9fdfd7aba65e29,IPSecVPN,0,0,0,0,0,static.114.154.76.144.clients.your-server.de,ipsec_client.pcap
+1,192.168.0.10,4500,144.76.154.114,4500,17,1421270042910,IPSec,VPN,,0731649644f302f1ded084cf9ad913f8,IPSecVPN,0,0,0,0,0,static.114.154.76.144.clients.your-server.de,ipsec_client.pcap

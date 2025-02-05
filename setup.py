@@ -8,7 +8,7 @@ __version__ = "0.0.0"
 
 REPO_NAME = "packet-parsing"
 AUTHOR_USER_NAME = "mpaul7"
-SRC_REPO = "parser"
+SRC_REPO = "src"
 AUTHOR_EMAIL = "mpaul7@gmail.com"
 
 

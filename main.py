@@ -3,9 +3,9 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import os
 import click
-
-from src.parser.components.packet_parsing import PCAPExtract
-from src.parser.utils.common import ip_swap
+from parser.components.packet_parsing import PCAPExtract
+# from parser.components.packet_parsing import PCAPExtract
+from parser.utils.common import ip_swap
 
 @click.group()
 def cli():
@@ -31,6 +31,11 @@ def packet_parse(pcap, output):
     except Exception as e:
         print(e, 1111)
         pass
+
+@cli.command(name='parse_new')
+def parse_new():
+    extractor = PCAPExtract()
+    df = extractor.extract_data("path/to/pcap")
 
 if __name__ == "__main__":
     cli()

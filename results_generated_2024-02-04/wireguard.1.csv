@@ -1,0 +1,3 @@
+,sip,sport,dip,dport,protocol,first_timestamp_ms,nfs_app_label,nfs_traffic_type_label,nfs_requested_server_name,hash,vpn,http_host,dns_query,dns_ans,fqdn,sni,reverse_ip,file_name
+0,10.0.4.2,47278,10.0.4.1,51820,17,1488326118359,WireGuard,VPN,,6cc58746043bd2eb457b6ea5f50dc8e9,WireGuard,0.0,0.0,0.0,0.0,0.0,,wireguard.1.pcap
+1,10.0.4.1,51820,10.0.4.2,47278,17,1488326802544,WireGuard,VPN,,da98bca988834f7a71de4d92dfc183f4,,,,,,,,wireguard.1.pcap

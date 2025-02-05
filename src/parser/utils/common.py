@@ -1,5 +1,7 @@
 import hashlib
 import socket
+import numpy as np
+import ipaddress
 import pandas as pd
 
 def add_hash_col(df: pd.DataFrame)->pd.DataFrame:
@@ -358,3 +360,18 @@ def is_wireguard_packet(payload):
 
     return False
     
+    
+def get_reverse_ip(df: pd.DataFrame)->pd.DataFrame:
+    """
+    Get the reverse IP address for a given IP address.
+    """
+    df['reverse_ip'] = np.nan
+    for i in range(len(df)):
+        dip = str((df.loc[i, 'dip']))
+        if not ipaddress.ip_address(dip).is_private:
+            try:
+                domain_name = socket.gethostbyaddr(dip)[0]
+                df.loc[i, 'reverse_ip'] = domain_name
+            except Exception as e:
+                pass
+    return df

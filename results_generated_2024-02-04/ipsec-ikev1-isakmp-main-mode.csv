@@ -1,0 +1,2 @@
+,sip,sport,dip,dport,protocol,first_timestamp_ms,nfs_app_label,nfs_traffic_type_label,nfs_requested_server_name,hash,vpn,http_host,dns_query,dns_ans,fqdn,sni,reverse_ip,file_name
+0,192.168.12.2,500,192.168.12.1,500,17,1439117415368,IPSec,VPN,,a21856f81d5f68ce007cb637dad3db77,IPSecVPN,0,0,0,0,0,,ipsec-ikev1-isakmp-main-mode.pcap
