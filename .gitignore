@@ -174,3 +174,5 @@ data/*
 results/*
 temp.py
 README_VPN.md
+docs/*
+installation/*

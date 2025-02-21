@@ -27,7 +27,10 @@ class PCAPExtract:
             pd.DataFrame: Combined features from all extractors
         """
         """ Extract features using different parsers"""
+        """ Pyshark also extracts packet information related to different VPN types. 
+        For exampl: OpenVPN, Wiregaurd, IPSecVPN, CiscoVPN."""
         df_pyshark = self.extractors['pyshark'].extract(pcap_file)
+        
         df_nfs = self.extractors['nfstream'].extract(pcap_file)
         
         """ Get reverse IP information """
