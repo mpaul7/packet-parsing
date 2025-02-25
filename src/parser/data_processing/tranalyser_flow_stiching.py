@@ -17,7 +17,7 @@ import click
 import pandas as pd
 
 """Data Files"""
-data_path = [
+data_path = []
 
 """Feature names"""
 features_original = [
