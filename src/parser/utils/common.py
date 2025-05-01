@@ -110,6 +110,7 @@ def is_openvpn_udp_packet(payload):
     # Check if opcode matches any known OpenVPN opcode
     if opcode in OPENVPN_OPCODES:
         packet_type = OPENVPN_OPCODES[opcode]
+        print(f"UDP OpenVPN packet type: {hex(opcode)} {packet_type}")
         return True, packet_type, hex(opcode)
     
     return False, None, hex(opcode)
@@ -126,11 +127,14 @@ def is_openvpn_tcp_packet(payload):
     """
     try:
         """TCP OpenVPN packets need minimum 3 bytes (2 for length + 1 for opcode)"""
-        if not payload_bytes or len(payload_bytes) < 3:
-            return False, None, None
+        
 
         payload_str = ''.join(c for c in payload if c.isalnum())
         payload_bytes = bytes.fromhex(payload_str) if isinstance(payload, str) else payload
+
+
+        if not payload_bytes or len(payload_bytes) < 3:
+            return False, None, None
     
         """Apply mask 0xF8 (11111000) to get first 5 bits"""
         opcode = payload_bytes[0] & 0xF8  

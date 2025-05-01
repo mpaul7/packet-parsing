@@ -1,6 +1,5 @@
 
 pandas 
-notebook
 numpy
 python-box==6.0.2
 pyYAML
