@@ -3,9 +3,9 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import os
 import click
-from parser.components.packet_parsing import PCAPExtract
+from src.parser.components.packet_parsing import PCAPExtract
 # from parser.components.packet_parsing import PCAPExtract
-from parser.utils.common import ip_swap
+from src.parser.utils.common import ip_swap
 
 @click.group()
 def cli():

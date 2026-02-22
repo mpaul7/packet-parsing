@@ -2,8 +2,8 @@
 Date: 2025-02-25
 Author: TW
 
-Tranalyser provides unidirectional flows. Each unidirectional flow is represented by flow direction "A" and "B" for forward and backward direction.. 
-Both the forward and backward flows have the same flowInd. 
+Tranalyser offers unidirectional flows. Each flow is represented by two directions—
+'A' for the forward direction and 'B' for the backward direction, and they share the same flowInd.
 
 - This script is used to stitch both the forward and backward flows together as a bidirectional flow
 - In this script, first feature_bytes are converted to integers.
@@ -14,10 +14,38 @@ Both the forward and backward flows have the same flowInd.
 """
 
 import click
+import os
 import pandas as pd
-
+from pathlib import Path
 """Data Files"""
-data_path = []
+data_path = [
+    '/media/solana/Backup Plus/Data/dvc_data/2020a_Wireline_Ethernet/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2020c_Mobile_Wifi/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2021a_Wireline_Ethernet/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2021c_Mobile_LTE/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2022a_Wireline_Ethernet/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2023a_Wireline_Ethernet/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2023c_Mobile_LTE/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2023e_MacOS_Wifi/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2024ag_Wireline_Ethernet/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2024a_Wireline_Ethernet/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2024cg_Mobile_LTE/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2024c_Mobile_LTE/features',
+    '/media/solana/Backup Plus/Data/dvc_data/2024e_MacOS_Wifi/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Homeoffice2024ag_Wireline_Ethernet/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Homeoffice2024a_Wireline_Ethernet/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Homeoffice2024c_Mobile_LTE/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Homeoffice2024e_MacOS_WiFi/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Homeoffice2025cg_Mobile_LTE/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Test2023a_Wireline_Ethernet/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Test2023c_Mobile_LTE/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Test2023e_MacOS_Wifi/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Test2024ag_Wireline_Ethernet/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Test2024a_Wireline_Ethernet/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Test2024cg_Mobile_LTE/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Test2024c_Mobile_LTE/features',
+    '/media/solana/Backup Plus/Data/dvc_data/Test2024e_MacOS_Wifi/features'   
+    ]
 
 """Feature names"""
 features_original = [
@@ -136,6 +164,9 @@ features_split = [
     "dsExcIat", "PyldEntropy", "PyldChRatio", "PyldBinRatio", "waveNumPnts", "waveNumLvl"
 ]
 
+features_multivalue = ["tcpJA4T", "dnsHFlg_OpC_RetC","dnsCntQu_Asw_Aux_Add","dnsQType", "dnsQClass", "dnsAType", "dnsAClass", "dnsATTL", "dnsMXpref",
+    "dnsSRVprio", "dnsSRVwgt", "dnsSRVprt", "dnsOptStat","sslExtList", "sslSigAlg", "sslECPt","sslALPNList","sslALPSList","sslNPNList","sslCipherList","sslNumCC_A_H_AD_HB"
+    ]
 def hex_to_int(val):
     """
     Convert a string like '0x0303' to its integer representation.
@@ -227,42 +258,59 @@ def cli():
     pass
 
 @cli.command()
-@click.option('--input-csv',  required=True, type=click.Path(exists=True), help="Path to the input CSV file containing unidirectional flows.")
-@click.option('--output-csv', required=True, type=click.Path(), help="Path to the output CSV file for the stitched flows.")
-def process(input_csv, output_csv):
+@click.argument('input_csv',  type=click.Path(exists=True))
+@click.option('--output_csv', required=False, type=click.Path(), help="Path to the output CSV file for the stitched flows.")
+def process(input_csv):
+    
+    failed_files = []
+    for input_file_path in data_path: 
+        # Get the relative path structure after 'pcaps' directory
+        features_path = Path(input_file_path)           
+        files = list(features_path.glob('**/*.csv'))
+        total_files = len(files)
+        for i, file in enumerate(files):
+            print(f'[{i}/{total_files}] -> {file} ')
+            head, tail = os.path.split(file)
+            head = head.replace('features', 'tranalyzer_bidirectional_features')
+            if not os.path.exists(head):
+                os.makedirs(head)
+            # tail = tail.replace('.csv', '.csv')
+            features_file_path = Path(head, tail)
 
-    # 1. Load the CSV file containing unidirectional flows
-    df = pd.read_csv(input_csv)
-    
-    # 2. Convert hex/byte notation to integers where applicable
-    existing_byte_cols = [col for col in feature_bytes if col in df.columns]
-    df[existing_byte_cols] = df[existing_byte_cols].applymap(hex_to_int)
-    
-    # 3. Group by the unique flow identifier (flowInd) and stitch flows together
-    bidirectional_df = df.groupby('flowInd').apply(stitch_flows).reset_index(drop=True)
-    
-    # 4. Reorder the columns in the final output:
-    #    Basic five-tuple fields first
-    basic_cols = ['flowInd', 'srcIP', 'srcPort', 'dstIP', 'dstPort', 'l4Proto']
-    
-    #    For each feature in features_split, place forward and backward columns together
-    feature_cols = []
-    for feat in features_split:
-        feature_cols.append(f"{feat}_fwd")
-        feature_cols.append(f"{feat}_bwd")
-    
-    #    Then the "keep_fwd" and "keep_bwd" features
-    final_cols = basic_cols + feature_cols + feature_keep_fwd + feature_keep_bwd
-    
-    # 5. Filter out columns that might not exist (to avoid KeyError if a column is missing)
-    existing_final_cols = [col for col in final_cols if col in bidirectional_df.columns]
-    bidirectional_df = bidirectional_df[existing_final_cols]
-    
-    # 6. Save the reordered bidirectional flows to the output CSV file
-    bidirectional_df.to_csv(output_csv, index=False)
-    
-    # 7. Print the resulting DataFrame for inspection
-    print(bidirectional_df)
+            # 1. Load the CSV file containing unidirectional flows
+            df = pd.read_csv(input_csv)
+            
+            # 2. Convert hex/byte notation to integers where applicable
+            existing_byte_cols = [col for col in feature_bytes if col in df.columns]
+            df[existing_byte_cols] = df[existing_byte_cols].applymap(hex_to_int)
+            
+        
+            
+            # 3. Group by the unique flow identifier (flowInd) and stitch flows together
+            bidirectional_df = df.groupby('flowInd').apply(stitch_flows).reset_index(drop=True)
+            
+            # 4. Reorder the columns in the final output:
+            #    Basic five-tuple fields first
+            basic_cols = ['flowInd', 'srcIP', 'srcPort', 'dstIP', 'dstPort', 'l4Proto']
+            
+            #    For each feature in features_split, place forward and backward columns together
+            feature_cols = []
+            for feat in features_split:
+                feature_cols.append(f"{feat}_fwd")
+                feature_cols.append(f"{feat}_bwd")
+            
+            #    Then the "keep_fwd" and "keep_bwd" features
+            final_cols = basic_cols + feature_cols + feature_keep_fwd + feature_keep_bwd
+            
+            # 5. Filter out columns that might not exist (to avoid KeyError if a column is missing)
+            existing_final_cols = [col for col in final_cols if col in bidirectional_df.columns]
+            bidirectional_df = bidirectional_df[existing_final_cols]
+            
+            # 6. Save the reordered bidirectional flows to the output CSV file
+            bidirectional_df.to_csv(features_file_path, index=False)
+            
+            # 7. Print the resulting DataFrame for inspection
+            print(bidirectional_df)
 
 if __name__ == '__main__':
     cli()

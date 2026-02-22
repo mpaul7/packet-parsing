@@ -13,7 +13,7 @@ import subprocess
 from nfstream import NFStreamer
 from ipaddress import IPv4Network
 from ipaddress import IPv4Address
-from parser.utils.common import (is_openvpn_udp_packet, 
+from src.parser.utils.common import (is_openvpn_udp_packet, 
                                     is_openvpn_tcp_packet, 
                                     is_ipsec_vpn_packet_v1, 
                                     is_ipsec_vpn_packet_v2,

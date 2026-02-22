@@ -12,8 +12,14 @@ class PySharkExtractor(BaseExtractor):
         flows = {}
         pkt1 = pkt2 = pkt3 = 0
         for pkt in pcap:
-            sip = sport = dip = dport = protocol  = vpn = http_host = dns_query = dns_ans = fqdn = sni = 0
+            sip = sport = dip = dport = protocol = vpn = http_host = dns_query = dns_ans = fqdn = sni = ja3 = ja4 = 0
+            mac = 0
             try:
+                # print(pkt.field_names)
+                # if "eth" in pkt:
+                #     mac_src = pkt.eth.src
+                #     print(f"MAC Source: {mac_src}")
+                mac = pkt.eth.src
                 if "ip" not in pkt:
                     continue
                 if "IP" in pkt:
@@ -35,7 +41,7 @@ class PySharkExtractor(BaseExtractor):
 
                     if hash_f not in flows:
                         pkt1 = pkt2 = pkt3 = 0
-                        curr_flow = [sip, sport, dip, dport, protocol, pkt1, pkt2, pkt3, vpn, http_host, dns_query, dns_ans, fqdn, sni]
+                        curr_flow = [sip, sport, dip, dport, protocol, mac, ja4, ja3, vpn, http_host, dns_query, dns_ans, fqdn, sni]
                         flows[hash_f] = curr_flow
                         
                     if "TCP" in pkt:
@@ -43,40 +49,41 @@ class PySharkExtractor(BaseExtractor):
                         type = "TCP"
                         sport = pkt.tcp.srcport
                         dport = pkt.tcp.dstport
-                        if "HTTP" in pkt:
-                            type = "HTTP"
-                            http_host = pkt.http.host
+                        # if "HTTP" in pkt:
+                        #     type = "HTTP"
+                        #     http_host = pkt.http.host
                         if "TLS" in pkt:
                             type = "TLS"
                             record = pkt.tls.record
                             if "Client Hello" in record:
                                 sni = pkt.tls.handshake_extensions_server_name
-                        if int(sport) == 1194 or int(dport) == 1194:  # Standard OpenVPN port
-                            # print(f"TCP OpenVPN packet: {sport} {dport}")
-                            print(f"TCP OpenVPN packet: {pkt.number}")
-                            type = "OpenVPN"
-                            # if hasattr(pkt.tcp, 'payload'):
-                            #     print(f"TCP payload found in packet {pkt.number}")
-                            # else:
-                            #     print(f"No TCP payload in packet {pkt.number}")
-                            # print(pkt.tcp.payload)
-                            if hasattr(pkt.tcp, 'payload'):
-                                is_openvpn, packet_type, opcode_hex = is_openvpn_tcp_packet(pkt.tcp.payload)
-                                # print(f"TCP OpenVPN packet: {pkt.number}-{sport}-{dport}-{is_openvpn}-{opcode_hex}-{packet_type}")
-                                # opcode_hex = opcode_hex.replace('0x', '')
-                            
-                                if is_openvpn:
-                                    vpn = "OpenVPN"
-                                    print(opcode_hex['opcode'].replace('0x', ''))
-                                    if pkt1 == 0:
-                                        pkt1 = opcode_hex['opcode'].replace('0x', '')
-                                    elif pkt2 == 0:
-                                        pkt2 = opcode_hex['opcode'].replace('0x', '')
-                                    elif pkt3 == 0:
-                                        pkt3 = opcode_hex['opcode'].replace('0x', '')
-                                    # print(f"TCP OpenVPN packet: {pkt.number}-{sport}-{dport}-{is_openvpn}-{opcode_hex}-{packet_type}")
-                    elif "UDP" in pkt:
-                        print(f"UDP packet")
+                                ja3 = pkt.tls.handshake_ja3
+                                ja4 = pkt.tls.handshake_ja4
+                                # print(ja3, ja4)
+                        """ check for IPSec packets in UDP """
+                        # if sport in ['4500', '500'] and dport in ['4500', '500']:
+                        #     print(sport, dport)
+                        #     # Get UDP payload if available.
+                        #     if hasattr(pkt.udp, 'payload'):
+                        #         if sport == '500':
+                        #             payload = pkt.udp.payload
+                        #             # 
+                        #         elif sport == '4500':
+                        #             payload = pkt.udp.payload
+                                    
+                        #             """ Ref [RFC 3948] - drop the first 12 bytes of the payload to get the actual IPsec packet 
+                        #             Non-ESP Marker is 4 bytes of zero aligning with the SPI field of an ESP packet."""
+                        #             payload = payload[12:]
+                        #         is_ipsec = is_ipsec_vpn_packet_v2(payload)
+                        #         if is_ipsec:
+                        #             type = "IPSec"
+                        #             vpn = "IPSecVPN"
+                        # if int(sport) == 1194 or int(dport) == 1194:  # Standard OpenVPN port
+                        #     type = "OpenVPN"
+                        #     is_openvpn, packet_type, opcode_hex = is_openvpn_tcp_packet(pkt.udp.payload)
+                        #     if is_openvpn:
+                        #         vpn = "OpenVPN"
+                    if "UDP" in pkt:
                         sport = pkt.udp.srcport
                         dport = pkt.udp.dstport
                         """ check for IPSec packets in UDP """
@@ -91,63 +98,51 @@ class PySharkExtractor(BaseExtractor):
                         #             """ Ref [RFC 3948] - drop the first 12 bytes of the payload to get the actual IPsec packet 
                         #             Non-ESP Marker is 4 bytes of zero aligning with the SPI field of an ESP packet."""
                         #             payload = payload[12:]
-                        #         is_ipsec = is_ipsec_vpn_packet_v2(payload)
-                        #         if is_ipsec:
-                        #             type = "IPSec"
-                        #             vpn = "IPSecVPN"
+                                # is_ipsec = is_ipsec_vpn_packet_v2(payload)
+                                # if is_ipsec:
+                                #     type = "IPSec"
+                                #     vpn = "IPSecVPN"
                                     
                         """ check for OpenVPN packets in UDP """
-                        if int(sport) == 1194 or int(dport) == 1194:  # Standard OpenVPN port
-                            # print(f"UDP OpenVPN packet: {sport} {dport}")
-                            type = "OpenVPN"
-                            if pkt.udp.payload:
-                                is_openvpn, packet_type, opcode_hex = is_openvpn_udp_packet(pkt.udp.payload)
-                           
-                                if is_openvpn:
-                                    vpn = "OpenVPN"
-                                    print(opcode_hex['opcode'].replace('0x', ''))
-                                    if pkt1 == 0:
-                                        pkt1 = opcode_hex['opcode'].replace('0x', '')
-                                    elif pkt2 == 0:
-                                        pkt2 = opcode_hex['opcode'].replace('0x', '')
-                                    elif pkt3 == 0:
-                                        pkt3 = opcode_hex['opcode'].replace('0x', '')
+                        # if int(sport) == 1194 or int(dport) == 1194:  # Standard OpenVPN port
+                        #     type = "OpenVPN"
+                        #     is_openvpn, packet_type, opcode_hex = is_openvpn_udp_packet(pkt.udp.payload)
+                        #     if is_openvpn:
+                        #         vpn = "OpenVPN"
                         """ check for WireGuard packets in UDP """
-                        if sport == '51820' or dport == '51820':
-                            if hasattr(pkt.udp, 'payload'):
-                                type = "WireGuard"
-                                is_wireguard = is_wireguard_packet(pkt.udp.payload)
-                                if is_wireguard:
+                        # if sport == '51820' or dport == '51820':
+                        #     if hasattr(pkt.udp, 'payload'):
+                        #         type = "WireGuard"
+                        #         is_wireguard = is_wireguard_packet(pkt.udp.payload)
+                        #         if is_wireguard:
                                     
-                                    vpn = "WireGuard"
-                        if "DNS" in pkt:
-                            type = "DNS"
-                            if pkt.dns.flags_response.int_value == 0: #pkt.dns.flags == '0x0100':  # dns query
-                                dns_query = pkt.dns.qry_name
-                                fqdn = socket.getfqdn(dns_query)
-                            elif pkt.dns.flags_response.int_value == 1: #pkt.dns.flags == '0x8180':  # dns answer
-                                if pkt.dns.qry_type == '1':  # IPv4
-                                    dns_ans = pkt.dns.a
-                                elif pkt.dns.qry_type == '28':  # IPv6
-                                    dns_ans = pkt.dns.aaaa
+                        #             vpn = "WireGuard"
+                        # if "DNS" in pkt:
+                        #     type = "DNS"
+                        #     if pkt.dns.flags_response.int_value == 0: #pkt.dns.flags == '0x0100':  # dns query
+                        #         dns_query = pkt.dns.qry_name
+                        #         fqdn = socket.getfqdn(dns_query)
+                        #     elif pkt.dns.flags_response.int_value == 1: #pkt.dns.flags == '0x8180':  # dns answer
+                        #         if pkt.dns.qry_type == '1':  # IPv4
+                        #             dns_ans = pkt.dns.a
+                        #         elif pkt.dns.qry_type == '28':  # IPv6
+                        #             dns_ans = pkt.dns.aaaa
                         if "QUIC" in pkt:
                             type = "QUIC"
                             if "Client Hello" in pkt.quic.tls_handshake:
                                 sni = pkt.quic.tls_handshake_extensions_server_name
-                    # hash_f = ''.join([str(sip), str(sport), str(dip), str(dport), str(protocol)])
-                    # hash_b = ''.join([str(dip), str(dport), str(sip), str(sport), str(protocol)])
+                                ja3 = pkt.quic.tls_handshake_ja3
+                                ja4 = pkt.quic.tls_handshake_ja4
+                                # print(f"QUIC: {ja3}, {ja4}")
 
                     if hash_f in flows:
                         flow = flows[hash_f]
                         if flow[-9] == 0:
-                            print(f"packet number1: {pkt.number}")
-                            flow[-9] = pkt1
-                        if flow[-8] == 0:
-                            print(f"packet number2: {pkt.number}")
-                            flow[-8] = pkt2
+                            flow[-9] = mac
                         if flow[-7] == 0:
-                            print(f"packet number3: {pkt.number}")
-                            flow[-7] = pkt3
+                            flow[-7] = ja3
+                        if flow[-8] == 0:
+                            flow[-8] = ja4
                         if flow[-6] == 0:
                             flow[-6] = vpn
                         if flow[-5] == 0:
@@ -164,14 +159,11 @@ class PySharkExtractor(BaseExtractor):
                     elif hash_b in flows:
                         flow = flows[hash_b]
                         if flow[-9] == 0:
-                            print(f"packet number1: {pkt.number}")
-                            flow[-9] = pkt1
-                        if flow[-8] == 0:
-                            print(f"packet number2: {pkt.number}")
-                            flow[-8] = pkt2
+                            flow[-9] = mac
                         if flow[-7] == 0:
-                            print(f"packet number3: {pkt.number}")
-                            flow[-7] = pkt3
+                            flow[-7] = ja3
+                        if flow[-8] == 0:
+                            flow[-8] = ja4
                         if flow[-6] == 0:
                             flow[-6] = vpn
                         if flow[-5] == 0:
@@ -185,17 +177,14 @@ class PySharkExtractor(BaseExtractor):
                         if flow[-1] == 0:
                             flow[-1] = sni
                         flows[hash_b] = flow
-                    # else:
-                    #     print(f"{pkt.number} -> {pkt1} - {pkt2} - {pkt3}")
-                        
-                    #     curr_flow = [sip, sport, dip, dport, protocol, pkt1, pkt2, pkt3, vpn, http_host, dns_query, dns_ans, fqdn, sni]
-                    #     flows[hash_f] = curr_flow
-                    #     pkt1 = pkt2 = pkt3 = 0
+                    else:
+                        curr_flow = [sip, sport, dip, dport, protocol, mac, ja4, ja3, vpn, http_host, dns_query, dns_ans, fqdn, sni]
+                        flows[hash_f] = curr_flow
             except Exception as e:
                 print(f'{pkt.number} - {e}') 
                 pass
         features = [v for k, v in flows.items()]
-        TUPLE_HEADER = ['sip', 'sport', 'dip', 'dport', 'protocol', 'pkt1', 'pkt2', 'pkt3', 'vpn', 'http_host', 'dns_query', 'dns_ans', 'fqdn', 'sni']
+        TUPLE_HEADER = ['sip', 'sport', 'dip', 'dport', 'protocol', 'mac', 'ja4', 'ja3','vpn', 'http_host', 'dns_query', 'dns_ans', 'fqdn', 'sni']
         df = pd.DataFrame(features, columns=TUPLE_HEADER)
+        print(df.head())
         return df
-    

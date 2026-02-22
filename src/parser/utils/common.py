@@ -363,8 +363,7 @@ def is_wireguard_packet(payload):
         return True
 
     return False
-    
-    
+      
 def get_reverse_ip(df: pd.DataFrame)->pd.DataFrame:
     """
     Get the reverse IP address for a given IP address.
