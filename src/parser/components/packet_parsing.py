@@ -563,20 +563,20 @@ class PCAPExtract:
             return tail or ntpath.basename(head)
         
         """Get various dataframes, static_ip and reverse_ip"""
-        df_pyshark = self.get_dns_sni_labels_pyshark(file_name)
-        # df_pyshark = self.get_dns_sni_labels_dpkt(file_name)
+        # df_pyshark = self.get_dns_sni_labels_pyshark(file_name)
         
         df_nfs = self.get_nfs_label(file_name)
+        
         # df_ndpi = self.get_ndpi_label(file_name)
         # df_static_ip = self.get_statifc_ip_label(df_pyshark)
-        df = self.get_reverse_ip(df_pyshark)
+        # df = self.get_reverse_ip(df_pyshark)
         
         """ Map all datagrames based on hash """
-        df = self._map(df_nfs, df, with_timestamp=False)
+        # df = self._map(df_nfs, df, with_timestamp=False)
         # df = self._map(df_ndpi, df, with_timestamp=False)
         # df = self._map(df_twc, df, with_timestamp=False)
-        df['file_name'] = _get_name(file_name)  # append file name with the features when return the dataframe
+        # df['file_name'] = _get_name(file_name)  # append file name with the features when return the dataframe
         
-        return df
+        return df_nfs
 
 
