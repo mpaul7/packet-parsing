@@ -34,7 +34,8 @@ def parse_new(pcap, output):
         # Make sure output directory exists
         if not os.path.exists(output):
             os.makedirs(output)
-        files = [f for f in os.listdir(pcap) if os.path.isfile(os.path.join(pcap, f))]
+        import glob
+        files = [os.path.basename(f) for f in glob.glob(os.path.join(pcap, '*.pcap')) if os.path.isfile(f)]
         if not files:
             print(f"No files found in directory: {pcap}")
             return
