@@ -4,6 +4,21 @@ import numpy as np
 import ipaddress
 import pandas as pd
 
+
+mac_dict = {
+        '30:05:5c:71:39:03' : 'brother_printer_1',
+        '00:1b:a9:ba:25:c9' : 'brother_printer_2',
+        '52:54:00:10:cd:dc' : 'git_server',
+        'c8:60:00:ee:7d:7a' : 'pc_Craig',
+        '04:92:26:57:0a:64' : 'pc_Jennie',
+        '28:df:eb:43:46:44' : 'laptop_Manjinder',
+        '00:50:b6:16:59:08' : 'laptop Monica', 
+        'c8:60:00:c8:78:91' : 'pc_Shubham',
+        '00:1f:54:80:32:c7' : 'lorex_webcam',
+        '14:eb:b6:94:32:fb' : 'tapo_TP_Link_camera',
+        '4c:ed:fb:a7:96:b5' : 'pc_soundcloud',
+        }
+
 def add_hash_col(df: pd.DataFrame)->pd.DataFrame:
     """
     Add a hash column to the dataframe

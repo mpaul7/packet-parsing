@@ -45,7 +45,7 @@ class PySharkExtractor(BaseExtractor):
                         flows[hash_f] = curr_flow
                         
                     if "TCP" in pkt:
-                        print(f"TCP packet")
+                        # print(f"TCP packet")
                         type = "TCP"
                         sport = pkt.tcp.srcport
                         dport = pkt.tcp.dstport
@@ -181,7 +181,7 @@ class PySharkExtractor(BaseExtractor):
                         curr_flow = [sip, sport, dip, dport, protocol, mac, ja4, ja3, vpn, http_host, dns_query, dns_ans, fqdn, sni]
                         flows[hash_f] = curr_flow
             except Exception as e:
-                print(f'{pkt.number} - {e}') 
+                # print(f'{pkt.number} - {e}') 
                 pass
         features = [v for k, v in flows.items()]
         TUPLE_HEADER = ['sip', 'sport', 'dip', 'dport', 'protocol', 'mac', 'ja4', 'ja3','vpn', 'http_host', 'dns_query', 'dns_ans', 'fqdn', 'sni']
