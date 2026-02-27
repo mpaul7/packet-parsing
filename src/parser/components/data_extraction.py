@@ -37,7 +37,7 @@ class PCAPExtract:
         # df_pyshark = self.extractors['pyshark'].extract(pcap_file)
         print("Extracting features using NFStream")
         df_nfs = self.extractors['nfstream'].extract(pcap_file)
-        df_nss = ip_swap(df_nfs)
+        df_nfs = ip_swap(df_nfs)
         print("Extracting features using nDPI")
         df_ndpi = self.extractors['ndpi'].extract(pcap_file)
         df_ndpi = ip_swap(df_ndpi)
