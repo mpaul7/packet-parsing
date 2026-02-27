@@ -7,7 +7,8 @@ class NFStreamExtractor(BaseExtractor):
     
     def extract(self, pcap_file: str) -> pd.DataFrame:
         df = NFStreamer(source=pcap_file).to_pandas()
-        df = df[['src_ip', 'src_port', 'dst_ip', 'dst_port', 'protocol',
+        df = df[['src_ip', 'src_port', 'dst_ip', 'dst_port', 'protocol', 
+                #  'src_mac',
                 'bidirectional_first_seen_ms', 'application_name',
                 'application_category_name', 'requested_server_name']].copy()
                 
@@ -16,6 +17,7 @@ class NFStreamExtractor(BaseExtractor):
             'src_port': 'sport', 
             'dst_ip': 'dip',
             'dst_port': 'dport',
+            # 'src_mac': 'mac',
             'bidirectional_first_seen_ms': 'first_timestamp_ms',
             'application_name': 'nfs_app_label',
             'application_category_name': 'nfs_traffic_type_label',
